@@ -13,7 +13,7 @@ with open('coord.csv', 'w+', newline='') as f:
     writer = csv.writer(f)
     while True:
         x, y = pg.position()
-        writer.writerow([timeit.default_timer() - start_time, (x - start_x)/4000])
+        writer.writerow([timeit.default_timer() - start_time, (x - start_x)/1500])
         if keyboard.is_pressed("esc"):
             break
 
@@ -26,5 +26,7 @@ plt.plot(x,y)
 plt.title('Displacement vs. Time')
 plt.ylabel('Displacement in inches')
 plt.xlabel('Time elapsed in seconds')
+
+
 
 plt.show()

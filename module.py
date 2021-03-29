@@ -16,13 +16,14 @@ interrupt = digitalio.DigitalInOut(board.C0)
 A_DEVICE_REGISTER = 0x03
 
 with busio.SPI(board.SCK, board.MOSI, board.MISO) as spi_bus:
-    #    cs = digitalio.DigitalInOut(board.D3)
-    #cs = board.D3
-    device = SPIDevice(spi_bus, 0)
+    cs = digitalio.DigitalInOut(board.C2)
+    cs.direction = digitalio.Direction.OUTPUT
+    cs.value = False
+    device = SPIDevice(spi_bus, cs)
 
     with device as spi:
         while(True):
             #spi.write(bytes([A_DEVICE_REGISTER]))
-            result = bytearray(64)
+            result = bytearray(4)
             spi.readinto(result)
             print(result)

@@ -13,20 +13,20 @@ with open('coord.csv', 'w+', newline='') as f:
     writer = csv.writer(f)
     while True:
         x, y = pg.position()
-        writer.writerow([timeit.default_timer() - start_time, (x - start_x)/1500])
+        row = [timeit.default_timer() - start_time, (x - start_x)/4000, (y - start_y)/4000]
+        writer.writerow(row)
         if keyboard.is_pressed("esc"):
             break
 
 style.use('ggplot')
 
-x,y = np.loadtxt('coord.csv', unpack = True, delimiter = ',')
+time,x_displacement,y_displacement = np.loadtxt('coord.csv', unpack = True, delimiter = ',')
 
-plt.plot(x,y)
+plt.plot(time, x_displacement, label = "x displacement")
+plt.plot(time, y_displacement, label = "y displacement")
 
 plt.title('Displacement vs. Time')
 plt.ylabel('Displacement in inches')
 plt.xlabel('Time elapsed in seconds')
-
-
-
+plt.legend()
 plt.show()

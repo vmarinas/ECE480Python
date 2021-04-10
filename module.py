@@ -13,9 +13,14 @@ from time import sleep
 # test if environment variable is set, if not set BLINKA_FT232H=1 before running
 os.environ["BLINKA_FT232H"]
 
-# DigitalInOut: Digital pin support
-# Define Motion/Interrupt, Reset, and Chip Select pins on motion sensor
-# w/ pins on breakout board. Defaults to input.
+# Params: val = value in counts, resolution: sensor resolution in cpi
+# Returns value in microns
+def ConvertCountsToMicrons(val, resolution):
+    return val / resolution * 25400
+
+
+# DigitalInOut: Digital pin support. Define Motion/Interrupt, Reset, and Chip Select pins on motion sensor
+# # w/ pins on breakout board. Defaults to input.
 # Motion/Interrupt: signals the breakout board when motion has occurred. Active low
 interrupt = digitalio.DigitalInOut(board.C0)
 # Reset: chip reset. Active low
@@ -45,27 +50,27 @@ x_pos = 0
 y_pos = 0
 
 # List of register values on the motion sensor
-REGISTER_CONFIG1 = 0x0F #  sets resolution in cpi
+REGISTER_CONFIG1 = 0x0F  # sensor resolution in cpi
 REGISTER_MOTION = 0x02  # used to determine if motion has occurred since the last time it was read
-# Reading the following registers clears them
 REGISTER_DELTA_X_L = 0x03  # X movement in counts since last report, lower 8 bits
 REGISTER_DELTA_X_H = 0x04  # X movement in counts since last report, upper 8 bits
 REGISTER_DELTA_Y_L = 0x05  # Y movement in counts since last report, lower 8 bits
 REGISTER_DELTA_Y_H = 0x06  # Y movement in counts since last report, upper 8 bits
 
-
-
 # Set motion sensor resolution to 12000cpi, default 5000 cpi
 # | 0x80 sets MSB to 1, required for write operations
-# 0x77 denotes full 12000cpi
+# 0x77 sets resolution 12000cpi as denoted by data sheet
 spi.write(bytes([REGISTER_CONFIG1 | 0x80, 0x77]))
 
 # TODO: double check float precision in the registers
 with open('coord_module.csv', 'w+', newline='') as f:
     writer = csv.writer(f)
     while True:
-        # Create new row in the csv file. Time elapsed, x-displacement, y-displacement
-        row = [timeit.default_timer() - start_time, (x_pos) / 1000000, (y_pos) / 1000000]
+        # Create new row in the csv file. Time elapsed, x-displacement in microns, y-displacement in microns
+        x_dis = ConvertCountsToMicrons(x_pos, 1000000)
+        y_dis = ConvertCountsToMicrons(y_pos, 1000000)
+        row = [timeit.default_timer() - start_time, x_dis, y_dis]
+
         # Pass until SPI device is locked
         while not spi.try_lock():
              pass
@@ -74,6 +79,7 @@ with open('coord_module.csv', 'w+', newline='') as f:
         # phase: edge of the clock that data is captured. First edge = 0, second edge = 1
         # polarity: the base state of clock line
         spi.configure(baudrate=2000000, phase=0, polarity=0)
+        # Active serial port
         chip_select.value = False
 
         # Each result will hold one byte of data read from their corresponding motion registers
@@ -103,28 +109,35 @@ with open('coord_module.csv', 'w+', newline='') as f:
         spi.write(bytes([REGISTER_DELTA_Y_H & 0x7f]))
         spi.readinto(result_y_h)
 
+        # Transactions complete
         chip_select.value = True
         spi.unlock()
 
-        x=bytearray(2)
-        y=bytearray(2)
-        x=result_x_h+result_x_l
-        y=result_y_h+result_y_l
-        x_pos+=int.from_bytes(x,byteorder='little',signed=True)
+        # Combine LOWORD and HIWORD bytes into a single array
+        x = bytearray(2)
+        y = bytearray(2)
+        x = result_x_h + result_x_l
+        y = result_y_h + result_y_l
+
+        # Convert bytes to a count value
+        x_pos += int.from_bytes(x, byteorder='little', signed=True)
         y_pos += int.from_bytes(y, byteorder='little', signed=True)
 
+        # Write row(time elapsed, x-displacement, y-displacement) to the csv file
         writer.writerow(row)
 
         # print count values being read from the Delta_X and Delta_Y registers
-        print(int.from_bytes(x,byteorder='little',signed=True),int.from_bytes(y,byteorder='little',signed=True))
+        print(int.from_bytes(x, byteorder='little', signed=True), int.from_bytes(y, byteorder='little', signed=True))
 
+        # Press ESC key to break loop
         if keyboard.is_pressed("esc"):
             break
 
 # todo: make live updating graph
+# Plot the captured data
 style.use('ggplot')
 
-time,x_displacement,y_displacement = np.loadtxt('coord_module.csv', unpack = True, delimiter = ',')
+time, x_displacement, y_displacement = np.loadtxt('coord_module.csv', unpack = True, delimiter = ',')
 
 plt.plot(time, x_displacement, label = "x displacement")
 plt.plot(time, y_displacement, label = "y displacement")
@@ -134,15 +147,10 @@ plt.plot(time, y_displacement, label = "y displacement")
 # 1) Start code. Wait two seconds.
 # 2) Move the dial of the motion stage a 1/4 revolution for two seconds. Then wait for two seconds.
 # 3) Repeat step 2 for one revolution
-plt.plot([2,4,6,8,10,12,14,16,18],[0,0.00224409,0.00224409,0.00448819, 0.00448819, 0.00673228, 0.00673228, 0.00897638, 0.00897638], label="control data")
-# Backup Procedure:
-# 1) Start code. Wait two seconds.
-# 2) Move the dial of the motion stage a 1/2 revolution for two seconds. Then wait for two seconds.
-# 3) Repeat step 2 for one revolution
-#plt.plot([0,2,4,6,8,10,12,14,16,18],[0,0,0.00448819,0.00448819,0.00897638, 0.00897638, 0.0134646, 0.0134646, 0.0179528, 0.0179528], label="control data")
+plt.plot([0, 2, 4, 6, 8, 10, 12, 14, 16, 18], [0, 0, 57, 57, 114, 114, 171, 171, 228, 228], label="control data")
 
 plt.title('Displacement vs. Time')
-plt.ylabel('Displacement in inches')
+plt.ylabel('Displacement in microns')
 plt.xlabel('Time elapsed in seconds')
 plt.legend()
 plt.show()

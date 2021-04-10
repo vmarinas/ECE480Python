@@ -10,72 +10,97 @@ import numpy as np
 import timeit
 from time import sleep
 
-# test if enviroment variable is set, if not set BLINKA_FT232H=1 before running
+# test if environment variable is set, if not set BLINKA_FT232H=1 before running
 os.environ["BLINKA_FT232H"]
 
-# set interrupt pin high ()
+# DigitalInOut: Digital pin support
+# Define Motion/Interrupt, Reset, and Chip Select pins on motion sensor
+# w/ pins on breakout board. Defaults to input.
+# Motion/Interrupt: signals the breakout board when motion has occurred. Active low
 interrupt = digitalio.DigitalInOut(board.C0)
+# Reset: chip reset. Active low
 rst = digitalio.DigitalInOut(board.C1)
+# Chip select (active low)
 chip_select = digitalio.DigitalInOut(board.C2)
 
+# Change direction of pins (input or output)
 interrupt.direction = digitalio.Direction.OUTPUT
 rst.direction = digitalio.Direction.OUTPUT
 chip_select.direction = digitalio.Direction.OUTPUT
 
-# rst.value=False
-rst.value=True
+# Reset motion sensor
+rst.value = True
 sleep(.001)
-rst.value=False
+rst.value = False
 sleep(.050)
-REGISTER_DELTA_L = 0x00
 chip_select.value = True
 
+# busio: Hardware accelerated external bus access, use for write and readinto
 spi = busio.SPI(board.SCK, MISO=board.MISO, MOSI=board.MOSI)
 
-# marks the start time of the code
+# Marks the start time of the code
 start_time = timeit.default_timer()
-# marks the origin of the module
+# Marks the origin of the module
 x_pos = 0
 y_pos = 0
 
-# set res 12000cpi, default seems to have x y res different
-        # | 0x80 sets MSB to 1 for write operations
-        # 0x77 denotes full 12000cpi
-spi.write(bytes([0x0F | 0x80, 0x77]))
+# List of register values on the motion sensor
+REGISTER_CONFIG1 = 0x0F #  sets resolution in cpi
+REGISTER_MOTION = 0x02  # used to determine if motion has occurred since the last time it was read
+# Reading the following registers clears them
+REGISTER_DELTA_X_L = 0x03  # X movement in counts since last report, lower 8 bits
+REGISTER_DELTA_X_H = 0x04  # X movement in counts since last report, upper 8 bits
+REGISTER_DELTA_Y_L = 0x05  # Y movement in counts since last report, lower 8 bits
+REGISTER_DELTA_Y_H = 0x06  # Y movement in counts since last report, upper 8 bits
+
+
+
+# Set motion sensor resolution to 12000cpi, default 5000 cpi
+# | 0x80 sets MSB to 1, required for write operations
+# 0x77 denotes full 12000cpi
+spi.write(bytes([REGISTER_CONFIG1 | 0x80, 0x77]))
 
 # TODO: double check float precision in the registers
 with open('coord_module.csv', 'w+', newline='') as f:
     writer = csv.writer(f)
     while True:
+        # Create new row in the csv file. Time elapsed, x-displacement, y-displacement
         row = [timeit.default_timer() - start_time, (x_pos) / 1000000, (y_pos) / 1000000]
+        # Pass until SPI device is locked
         while not spi.try_lock():
              pass
+        # Configure the SPI bus
+        # baudrate: serial port clock frequency in Hz
+        # phase: edge of the clock that data is captured. First edge = 0, second edge = 1
+        # polarity: the base state of clock line
         spi.configure(baudrate=2000000, phase=0, polarity=0)
         chip_select.value = False
 
-        # Delta_X LOWORD, lower 2 bytes
-        result_x_l = bytearray(1)
-        # Delta_X HIWORD, upper 2 bytes
-        result_x_h = bytearray(1)
-        # Delta_Y LOWORD, lower 2 bytes
-        result_y_l = bytearray(1)
-        # Delta_Y HIWORD, upper 2 bytes
-        result_y_h = bytearray(1)
+        # Each result will hold one byte of data read from their corresponding motion registers
+        result_motion = bytearray(1) # Motion
+        result_x_l = bytearray(1)  # Delta_X_L
+        result_x_h = bytearray(1)  # Delta_X_H
+        result_y_l = bytearray(1)  # Delta_Y_L
+        result_y_h = bytearray(1)  # Delta_Y_H
 
-        # set and read motion bit to freeze values for read
-        spi.write(bytes([0x02 | 0x80, 0x01]))
-        spi.write(bytes([0x02 & 0x7f]))
-        spi.readinto(result_x_l)
+        # Start procedure to read motion register data
+        # Write any value to the Motion register
+        spi.write(bytes([REGISTER_MOTION | 0x80, 0x01]))
+        # Read the Motion register. This freezes the Delta X/Y register values
+        spi.write(bytes([REGISTER_MOTION & 0x7f]))
+        spi.readinto(result_motion)
 
-        # & 0x7y sets MSB to 0 for read operations
-        # read x_l, x_h, y_l, y_h registers
-        spi.write(bytes([0x03 & 0x7f]))
+        # Read the Delta_X_L register. Store byte
+        spi.write(bytes([REGISTER_DELTA_X_L & 0x7f]))
         spi.readinto(result_x_l)
-        spi.write(bytes([0x04 & 0x7f]))
+        # Read the Delta_X_H register. Store byte
+        spi.write(bytes([REGISTER_DELTA_X_H & 0x7f]))
         spi.readinto(result_x_h)
-        spi.write(bytes([0x05 & 0x7f]))
+        # Read the Delta_Y_L register. Store byte
+        spi.write(bytes([REGISTER_DELTA_Y_L & 0x7f]))
         spi.readinto(result_y_l)
-        spi.write(bytes([0x06 & 0x7f]))
+        # Read the Delta_Y_H register. Store byte
+        spi.write(bytes([REGISTER_DELTA_Y_H & 0x7f]))
         spi.readinto(result_y_h)
 
         chip_select.value = True
@@ -95,8 +120,6 @@ with open('coord_module.csv', 'w+', newline='') as f:
 
         if keyboard.is_pressed("esc"):
             break
-    # print(x.decode('utf-16le'),y.decode('utf-16le'))
-    # print(resultt)
 
 # todo: make live updating graph
 style.use('ggplot')

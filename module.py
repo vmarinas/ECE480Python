@@ -2,15 +2,12 @@ import os
 import board
 import digitalio
 import busio
-
-import pyautogui as pg
 import csv
 import keyboard
 from matplotlib import pyplot as plt
 from matplotlib import style
 import numpy as np
 import timeit
-# from adafruit_bus_device.spi_device import SPIDevice
 from time import sleep
 
 # test if enviroment variable is set, if not set BLINKA_FT232H=1 before running
@@ -33,25 +30,20 @@ sleep(.050)
 REGISTER_DELTA_L = 0x00
 chip_select.value = True
 
-# with busio.SPI(board.SCLK, board.MOSI, board.MISO) as spi_bus:
-#     #    cs = digitalio.DigitalInOut(board.D3)
-#     device = SPIDevice(spi_bus, digitalio.DigitalInOut(board.C2))
-#
-#     with device as spi:
-#         while(True):
-#             spi.write(bytes([REGISTER_DELTA_L,0x01]))
-#             result = bytearray(1)
-#             spi.readinto(result)
-#             # result = spi.read()
-#             print(result)
-#             break
-
 spi = busio.SPI(board.SCK, MISO=board.MISO, MOSI=board.MOSI)
 
+# marks the start time of the code
 start_time = timeit.default_timer()
+# marks the origin of the module
 x_pos = 0
 y_pos = 0
 
+# set res 12000cpi, default seems to have x y res different
+        # | 0x80 sets MSB to 1 for write operations
+        # 0x77 denotes full 12000cpi
+spi.write(bytes([0x0F | 0x80, 0x77]))
+
+# TODO: double check float precision in the registers
 with open('coord_module.csv', 'w+', newline='') as f:
     writer = csv.writer(f)
     while True:
@@ -60,16 +52,15 @@ with open('coord_module.csv', 'w+', newline='') as f:
              pass
         spi.configure(baudrate=2000000, phase=0, polarity=0)
         chip_select.value = False
-        result_x_l = bytearray(1)
-        result_x_h = bytearray(1)
-        result_y_l = bytearray(1)
-        result_y_h = bytearray(1)
 
-        # set res 12000cpi, default seems to have x y res different
-        # | 0x80 sets MSB to 1 for write operations
-        # 0x77 denotes full 12000cpi
-        # TODO: move this outside of the loop so it only gets set once
-        spi.write(bytes([0x0F | 0x80, 0x77]))
+        # Delta_X LOWORD, lower 2 bytes
+        result_x_l = bytearray(1)
+        # Delta_X HIWORD, upper 2 bytes
+        result_x_h = bytearray(1)
+        # Delta_Y LOWORD, lower 2 bytes
+        result_y_l = bytearray(1)
+        # Delta_Y HIWORD, upper 2 bytes
+        result_y_h = bytearray(1)
 
         # set and read motion bit to freeze values for read
         spi.write(bytes([0x02 | 0x80, 0x01]))
@@ -98,6 +89,8 @@ with open('coord_module.csv', 'w+', newline='') as f:
         y_pos += int.from_bytes(y, byteorder='little', signed=True)
 
         writer.writerow(row)
+
+        # print count values being read from the Delta_X and Delta_Y registers
         print(int.from_bytes(x,byteorder='little',signed=True),int.from_bytes(y,byteorder='little',signed=True))
 
         if keyboard.is_pressed("esc"):
@@ -112,6 +105,18 @@ time,x_displacement,y_displacement = np.loadtxt('coord_module.csv', unpack = Tru
 
 plt.plot(time, x_displacement, label = "x displacement")
 plt.plot(time, y_displacement, label = "y displacement")
+
+# Plotting control data
+# Procedure:
+# 1) Start code. Wait two seconds.
+# 2) Move the dial of the motion stage a 1/4 revolution for two seconds. Then wait for two seconds.
+# 3) Repeat step 2 for one revolution
+plt.plot([2,4,6,8,10,12,14,16,18],[0,0.00224409,0.00224409,0.00448819, 0.00448819, 0.00673228, 0.00673228, 0.00897638, 0.00897638], label="control data")
+# Backup Procedure:
+# 1) Start code. Wait two seconds.
+# 2) Move the dial of the motion stage a 1/2 revolution for two seconds. Then wait for two seconds.
+# 3) Repeat step 2 for one revolution
+#plt.plot([0,2,4,6,8,10,12,14,16,18],[0,0,0.00448819,0.00448819,0.00897638, 0.00897638, 0.0134646, 0.0134646, 0.0179528, 0.0179528], label="control data")
 
 plt.title('Displacement vs. Time')
 plt.ylabel('Displacement in inches')

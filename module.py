@@ -142,7 +142,7 @@ while True:
 # Plot the captured data
 style.use('ggplot')
 
-time, x_displacement, y_displacement = np.loadtxt('coord_module.csv', unpack = True, delimiter = ',')
+time, x_displacement, y_displacement = np.loadtxt('coord_module.txt', unpack = True, delimiter = ',')
 
 plt.plot(time, x_displacement, label = "x displacement")
 plt.plot(time, y_displacement, label = "y displacement")

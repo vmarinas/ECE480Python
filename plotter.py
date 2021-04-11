@@ -14,7 +14,7 @@ plt.xlabel('Time elapsed in seconds')
 plt.plot([0, 2, 4, 6, 8, 10, 12, 14, 16, 18], [0, 0, 57, 57, 114, 114, 171, 171, 228, 228], label="control data")
 line1, = ax.plot(0, 0, label="x-displacement")
 line2, = ax.plot(0, 0, label="y-displacement")
-plt.legend()
+plt.legend(loc="upper left")
 
 def animate(i):
     data = pd.read_csv('coord_module.csv')

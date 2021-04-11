@@ -68,7 +68,6 @@ with open('coord_module.csv', 'w') as f:
     writer = csv.DictWriter(f, fieldnames=fieldnames)
     writer.writeheader()
 
-
 while True:
     # Pass until SPI device is locked
     while not spi.try_lock():
@@ -139,6 +138,7 @@ while True:
     if keyboard.is_pressed("esc"):
         break
 '''
+# Old plotting code
 # Plot the captured data
 style.use('ggplot')
 

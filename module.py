@@ -64,7 +64,7 @@ spi.write(bytes([REGISTER_CONFIG1 | 0x80, 0x77]))
 fieldnames = ["time", "x_displacement", "y_displacement"]
 
 # Overwrite new or existing csv file
-with open('coord_module.csv', 'w') as f:
+with open('coord_module.txt', 'w') as f:
     writer = csv.DictWriter(f, fieldnames=fieldnames)
     writer.writeheader()
 
@@ -122,7 +122,7 @@ while True:
     y_pos += int.from_bytes(y, byteorder='little', signed=True)
 
     # Write new row in the csv file. Time elapsed, x-displacement in microns, y-displacement in microns
-    with open('coord_module.csv', 'a') as f:
+    with open('coord_module.txt', 'a') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         info = {
             "time": timeit.default_timer() - start_time,

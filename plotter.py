@@ -17,7 +17,7 @@ line2, = ax.plot(0, 0, label="y-displacement")
 plt.legend(loc="upper left")
 
 def animate(i):
-    data = pd.read_csv('coord_module.csv')
+    data = pd.read_csv('coord_module.txt')
     time = data['time']
     x_displacement = data['x_displacement']
     y_displacement = data['y_displacement']

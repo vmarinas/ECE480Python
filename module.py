@@ -4,9 +4,6 @@ import digitalio
 import busio
 import csv
 import keyboard
-from matplotlib import pyplot as plt
-from matplotlib import style
-import numpy as np
 import timeit
 from time import sleep
 
@@ -63,77 +60,85 @@ REGISTER_DELTA_Y_H = 0x06  # Y movement in counts since last report, upper 8 bit
 spi.write(bytes([REGISTER_CONFIG1 | 0x80, 0x77]))
 
 # TODO: double check float precision in the registers
-with open('coord_module.csv', 'w+', newline='') as f:
-    writer = csv.writer(f)
-    while True:
-        # Create new row in the csv file. Time elapsed, x-displacement in microns, y-displacement in microns
-        x_dis = ConvertCountsToMicrons(x_pos, 1000000)
-        y_dis = ConvertCountsToMicrons(y_pos, 1000000)
-        row = [timeit.default_timer() - start_time, x_dis, y_dis]
 
-        # Pass until SPI device is locked
-        while not spi.try_lock():
-             pass
-        # Configure the SPI bus
-        # baudrate: serial port clock frequency in Hz
-        # phase: edge of the clock that data is captured. First edge = 0, second edge = 1
-        # polarity: the base state of clock line
-        spi.configure(baudrate=2000000, phase=0, polarity=0)
-        # Active serial port
-        chip_select.value = False
+fieldnames = ["time", "x_displacement", "y_displacement"]
 
-        # Each result will hold one byte of data read from their corresponding motion registers
-        result_motion = bytearray(1) # Motion
-        result_x_l = bytearray(1)  # Delta_X_L
-        result_x_h = bytearray(1)  # Delta_X_H
-        result_y_l = bytearray(1)  # Delta_Y_L
-        result_y_h = bytearray(1)  # Delta_Y_H
+# Overwrite new or existing csv file
+with open('coord_module.csv', 'w') as f:
+    writer = csv.DictWriter(f, fieldnames=fieldnames)
+    writer.writeheader()
 
-        # Start procedure to read motion register data
-        # Write any value to the Motion register
-        spi.write(bytes([REGISTER_MOTION | 0x80, 0x01]))
-        # Read the Motion register. This freezes the Delta X/Y register values
-        spi.write(bytes([REGISTER_MOTION & 0x7f]))
-        spi.readinto(result_motion)
 
-        # Read the Delta_X_L register. Store byte
-        spi.write(bytes([REGISTER_DELTA_X_L & 0x7f]))
-        spi.readinto(result_x_l)
-        # Read the Delta_X_H register. Store byte
-        spi.write(bytes([REGISTER_DELTA_X_H & 0x7f]))
-        spi.readinto(result_x_h)
-        # Read the Delta_Y_L register. Store byte
-        spi.write(bytes([REGISTER_DELTA_Y_L & 0x7f]))
-        spi.readinto(result_y_l)
-        # Read the Delta_Y_H register. Store byte
-        spi.write(bytes([REGISTER_DELTA_Y_H & 0x7f]))
-        spi.readinto(result_y_h)
+while True:
+    # Pass until SPI device is locked
+    while not spi.try_lock():
+        pass
+    # Configure the SPI bus
+    # baudrate: serial port clock frequency in Hz
+    # phase: edge of the clock that data is captured. First edge = 0, second edge = 1
+    # polarity: the base state of clock line
+    spi.configure(baudrate=2000000, phase=0, polarity=0)
+    # Active serial port
+    chip_select.value = False
 
-        # Transactions complete
-        chip_select.value = True
-        spi.unlock()
+    # Each result will hold one byte of data read from their corresponding motion registers
+    result_motion = bytearray(1) # Motion
+    result_x_l = bytearray(1)  # Delta_X_L
+    result_x_h = bytearray(1)  # Delta_X_H
+    result_y_l = bytearray(1)  # Delta_Y_L
+    result_y_h = bytearray(1)  # Delta_Y_H
 
-        # Combine LOWORD and HIWORD bytes into a single array
-        x = bytearray(2)
-        y = bytearray(2)
-        x = result_x_h + result_x_l
-        y = result_y_h + result_y_l
+    # Start procedure to read motion register data
+    # Write any value to the Motion register
+    spi.write(bytes([REGISTER_MOTION | 0x80, 0x01]))
+    # Read the Motion register. This freezes the Delta X/Y register values
+    spi.write(bytes([REGISTER_MOTION & 0x7f]))
+    spi.readinto(result_motion)
 
-        # Convert bytes to a count value
-        x_pos += int.from_bytes(x, byteorder='little', signed=True)
-        y_pos += int.from_bytes(y, byteorder='little', signed=True)
+    # Read the Delta_X_L register. Store byte
+    spi.write(bytes([REGISTER_DELTA_X_L & 0x7f]))
+    spi.readinto(result_x_l)
+    # Read the Delta_X_H register. Store byte
+    spi.write(bytes([REGISTER_DELTA_X_H & 0x7f]))
+    spi.readinto(result_x_h)
+    # Read the Delta_Y_L register. Store byte
+    spi.write(bytes([REGISTER_DELTA_Y_L & 0x7f]))
+    spi.readinto(result_y_l)
+    # Read the Delta_Y_H register. Store byte
+    spi.write(bytes([REGISTER_DELTA_Y_H & 0x7f]))
+    spi.readinto(result_y_h)
 
-        # Write row(time elapsed, x-displacement, y-displacement) to the csv file
-        writer.writerow(row)
+    # Transactions complete
+    chip_select.value = True
+    spi.unlock()
 
-        # print count values being read from the Delta_X and Delta_Y registers
-        print(int.from_bytes(x, byteorder='little', signed=True), int.from_bytes(y, byteorder='little', signed=True))
+    # Combine LOWORD and HIWORD bytes into a single array
+    x = bytearray(2)
+    y = bytearray(2)
+    x = result_x_h + result_x_l
+    y = result_y_h + result_y_l
 
-        # Press ESC key to break loop
-        if keyboard.is_pressed("esc"):
-            break
+    # Convert bytes to a count value
+    x_pos += int.from_bytes(x, byteorder='little', signed=True)
+    y_pos += int.from_bytes(y, byteorder='little', signed=True)
 
-# todo: make live updating graph
+    # Write new row in the csv file. Time elapsed, x-displacement in microns, y-displacement in microns
+    with open('coord_module.csv', 'a') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        info = {
+            "time": timeit.default_timer() - start_time,
+            "x_displacement": ConvertCountsToMicrons(x_pos, 1000000),
+            "y_displacement": ConvertCountsToMicrons(y_pos, 1000000)
+        }
+        writer.writerow(info)
+
+    # print count values being read from the Delta_X and Delta_Y registers
+    print(int.from_bytes(x, byteorder='little', signed=True), int.from_bytes(y, byteorder='little', signed=True))
+
+    # Press ESC key to break loop
+    if keyboard.is_pressed("esc"):
+        break
+'''
 # Plot the captured data
 style.use('ggplot')
 
@@ -154,3 +159,4 @@ plt.ylabel('Displacement in microns')
 plt.xlabel('Time elapsed in seconds')
 plt.legend()
 plt.show()
+'''

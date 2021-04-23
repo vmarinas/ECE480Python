@@ -50,3 +50,9 @@
    * Windows requires use of zadig every time usb port is changed as windows automatically overwrites driver
    ** this is not required for linux and osx
    * To run static plot/graph on escape (plot without launching the seperate realtime plotting file) comment out plotting code in module.py and add in required imports from plotter.py(matplotlib, pandas, numpy)
+
+##### Datasheets
+   * [XY displacement sensor](https://d3s5r33r268y59.cloudfront.net/datasheets/9604/2017-05-07-18-19-11/PMS0058-PMW3360DM-T2QU-DS-R1.50-26092016._20161202173741.pdf)
+   `ALL REGISTER ADDRESSES ARE ON PAGE 29 IN A TABLE. REFERENCE THIS`
+   * [adafruit USB-SPI bus](https://www.adafruit.com/product/2264?gclid=Cj0KCQiAs5eCBhCBARIsAEhk4r4Gve8tj7aJNjhQgQO9qX7yfBwBulwKgRsjbuX3YjJ2OURq-_z2lv0aAmEMEALw_wcB)
+   * [FT232H](https://ftdichip.com/wp-content/uploads/2020/07/DS_FT232H.pdf)

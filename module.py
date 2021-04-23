@@ -23,6 +23,8 @@ interrupt = digitalio.DigitalInOut(board.C0)
 # Reset: chip reset. Active low
 rst = digitalio.DigitalInOut(board.C1)
 # Chip select (active low)
+# NEEDS PULLDOWN RESISTOR ON THIS PIN TO FUNCITON RIGHT
+# CURRENTLY JUST PLUGGED INTO SECOND GROUND AND ALWAYS SELECTED (NOT GOOD)
 chip_select = digitalio.DigitalInOut(board.C2)
 
 # Change direction of pins (input or output)
